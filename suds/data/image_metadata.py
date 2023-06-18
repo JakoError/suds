@@ -10,6 +10,7 @@ import numpy as np
 import pyarrow.parquet as pq
 import torch
 import torch.nn.functional as F
+import torchvision.transforms.functional as TF
 from PIL import Image
 
 from suds.stream_utils import (buffer_from_stream, image_from_stream, get_filesystem, table_from_stream)
@@ -52,7 +53,7 @@ class ImageMetadata:
         if size[0] != self.W or size[1] != self.H:
             rgbs = rgbs.resize((self.W, self.H), Image.LANCZOS)
 
-        return torch.ByteTensor(np.asarray(rgbs))
+        return torch.ByteTensor(torch.from_numpy(np.copy(np.asarray(rgbs))))
 
     def load_mask(self) -> torch.Tensor:
         if self.mask_path is None:
@@ -67,7 +68,7 @@ class ImageMetadata:
         if size[0] != self.W or size[1] != self.H:
             mask = mask.resize((self.W, self.H), Image.NEAREST)
 
-        return torch.BoolTensor(np.asarray(mask))
+        return torch.BoolTensor(torch.from_numpy(np.copy(np.asarray(mask))))
 
     def load_sky_mask(self) -> torch.Tensor:
         if self.sky_mask_path is None:

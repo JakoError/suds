@@ -1,12 +1,12 @@
 import json
 import os
+
 from typing import List, Dict, Any
 
 import tqdm
 
 import torch
 
-import fire
 import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
@@ -21,9 +21,6 @@ from nuscenes.utils.data_classes import LidarPointCloud, Box
 from nuscenes.utils.geometry_utils import BoxVisibility, transform_matrix
 from nuscenes.utils.kitti import KittiDB
 from nuscenes.utils.splits import create_splits_logs
-
-from suds.stream_utils import get_filesystem
-
 
 class KittiConverter:
     def __init__(self,
@@ -265,8 +262,8 @@ class KittiConverter:
             pose_file = os.path.join(pose_folder, token + sample_token + '.npy')
             np.save(pose_file, ego_pose_matrix)
 
-            # save depth
-            self.process_depth_sample(sample_token, token, depth_folder)
+            # save depth !! incorrect data
+            # self.process_depth_sample(sample_token, token, depth_folder)
 
             # Convert image (jpg to png).
             src_im_path = os.path.join(self.nusc.dataroot, filename_cam_full)
@@ -473,9 +470,11 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='nusc converter')
 
-    parser.add_argument('--nusc_data_root', type=str, default='/nuscenes/')
-    parser.add_argument('--nusc_kitti_dir', type=str, default='/nusc_kitti/')
-    parser.add_argument('--multi', type=bool, default=True)
+    # parser.add_argument('--nusc_data_root', type=str, default='/nuscenes/')
+    # parser.add_argument('--nusc_kitti_dir', type=str, default='/nusc_kitti/')
+    parser.add_argument('--nusc_data_root', type=str, default='/root/autodl-tmp/zhouxiaoyu/nuscenes')
+    parser.add_argument('--nusc_kitti_dir', type=str, default='/root/autodl-tmp/zhouzhexian/nusc_kitti/')
+    parser.add_argument('--multi', type=bool, default=False)
 
     args = parser.parse_args()
 

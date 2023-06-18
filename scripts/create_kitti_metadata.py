@@ -106,11 +106,14 @@ def get_kitti_items(kitti_root: str,
             rx = oxts[3]  # roll
             ry = oxts[4]  # pitch
             rz = oxts[5]  # heading
-            Rx = torch.DoubleTensor([[1, 0, 0], [0, np.cos(rx), -np.sin(rx)],
+            Rx = torch.DoubleTensor([[1, 0, 0], 
+                                     [0, np.cos(rx), -np.sin(rx)],
                                      [0, np.sin(rx), np.cos(rx)]])  # base => nav  (level oxts => rotated oxts)
-            Ry = torch.DoubleTensor([[np.cos(ry), 0, np.sin(ry)], [0, 1, 0],
+            Ry = torch.DoubleTensor([[np.cos(ry), 0, np.sin(ry)], 
+                                     [0, 1, 0],
                                      [-np.sin(ry), 0, np.cos(ry)]])  # base => nav  (level oxts => rotated oxts)
-            Rz = torch.DoubleTensor([[np.cos(rz), -np.sin(rz), 0], [np.sin(rz), np.cos(rz), 0],
+            Rz = torch.DoubleTensor([[np.cos(rz), -np.sin(rz), 0], 
+                                     [np.sin(rz), np.cos(rz), 0],
                                      [0, 0, 1]])  # base => nav  (level oxts => rotated oxts)
             imu_pose[:3, :3] = torch.matmul(torch.matmul(Rz, Ry), Rx)
 

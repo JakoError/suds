@@ -29,6 +29,8 @@ from suds.suds_constants import FEATURES, TIME, BACKWARD_NEIGHBOR_TIME_DIFF, FOR
     BACKWARD_FLOW_VALID, FORWARD_FLOW_VALID, BACKWARD_NEIGHBOR_W2C, BACKWARD_NEIGHBOR_K, FORWARD_NEIGHBOR_W2C, \
     FORWARD_NEIGHBOR_K
 
+from pyquaternion import Quaternion
+
 CONSOLE = Console(width=120)
 
 
@@ -141,10 +143,11 @@ class SUDSDataManager(DataManager):
             feature_colors=self.config.feature_colors,
             device=self.device
         )
-
+    
     def all_indices_eval_dataloader(self, generate_ring_view: bool, video_ids: Optional[Set[int]],
                                     start_frame: Optional[int], end_frame: Optional[int], focal_mult: Optional[float],
-                                    pos_shift: Optional[torch.Tensor]) -> SUDSEvalDataLoader:
+                                    pos_shift: Optional[torch.Tensor] = None,
+                                    camera_rotation: Optional[torch.Tensor] = None) -> SUDSEvalDataLoader:
         eval_dataparser_outputs = self.dataparser.get_dataparser_outputs(split='val')
 
         image_indices = []
@@ -169,7 +172,10 @@ class SUDSDataManager(DataManager):
 
         for i in range(get_rank() * image_chunk, len(filtered_items), image_chunk * get_world_size()):
             for j in range(image_chunk):
-                image_indices.append(filtered_items[i + j].image_index)
+                if i + j < len(filtered_items):
+                    image_indices.append(filtered_items[i + j].image_index)
+        # for i in range(10):
+        #     image_indices.append(filtered_items[i].image_index)
 
         cameras = eval_dataparser_outputs.metadata[ALL_CAMERAS]
         if focal_mult is not None:
@@ -185,9 +191,29 @@ class SUDSDataManager(DataManager):
                 times=cameras.times
             )
 
-        if pos_shift is not None:
+        if pos_shift is not None or camera_rotation is not None:
             c2w = cameras.camera_to_worlds.clone()
-            c2w[..., 3] += pos_shift.to(c2w) / self.train_dataparser_outputs.metadata[POSE_SCALE_FACTOR]
+            if pos_shift is not None:
+                c2w[..., 3] += pos_shift.to(c2w) / self.train_dataparser_outputs.metadata[POSE_SCALE_FACTOR]
+            if camera_rotation is not None:
+                w = camera_rotation[0]
+                rx = camera_rotation[1]  # roll
+                ry = camera_rotation[2]  # pitch
+                rz = camera_rotation[3]  # heading
+                Rx = torch.FloatTensor([[1, 0, 0], 
+                                        [0, np.cos(rx), -np.sin(rx)],
+                                        [0, np.sin(rx), np.cos(rx)]])  # base => nav  (level oxts => rotated oxts)
+                Ry = torch.FloatTensor([[np.cos(ry), 0, np.sin(ry)], 
+                                        [0, 1, 0],
+                                        [-np.sin(ry), 0, np.cos(ry)]])  # base => nav  (level oxts => rotated oxts)
+                Rz = torch.FloatTensor([[np.cos(rz), -np.sin(rz), 0], 
+                                        [np.sin(rz), np.cos(rz), 0],
+                                        [0, 0, 1]])  # base => nav  (level oxts => rotated oxts)
+                c2w[..., :3, :3] = c2w[..., :3, :3] @ torch.matmul(torch.matmul(Rz, Ry), Rx)
+                # rotation = camera_rotation.cpu().numpy()
+                # rotation[0] = np.cos(rotation[0] / 2.)
+                # c2w[..., :3, :3] = c2w[..., :3, :3] @ torch.FloatTensor(
+                #     Quaternion(rotation).rotation_matrix).to(c2w)
             cameras = Cameras(
                 camera_to_worlds=c2w,
                 fx=cameras.fx,
@@ -282,6 +308,7 @@ class SUDSDataManager(DataManager):
             ray_bundle.metadata[BACKWARD_FLOW_VALID] = batch[BACKWARD_FLOW_VALID].to(self.device)
             ray_bundle.metadata[FORWARD_FLOW_VALID] = batch[FORWARD_FLOW_VALID].to(self.device)
 
+        print('debug: load next_train')
         return ray_bundle, batch
 
     def next_eval(self, step: int) -> Tuple[RayBundle, Dict]:
@@ -296,6 +323,8 @@ class SUDSDataManager(DataManager):
         ray_bundle = self.train_ray_generator(batch[RAY_INDEX])
         ray_bundle.times = batch[TIME].to(self.device)
         ray_bundle.metadata[VIDEO_ID] = batch[VIDEO_ID].to(self.device)
+
+        print('debug: load next_eval')
         return ray_bundle, batch
 
     def next_eval_image(self, step: int) -> Tuple[int, RayBundle, Dict]:

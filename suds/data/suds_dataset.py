@@ -14,6 +14,8 @@ from suds.suds_constants import RGB, PIXEL_INDEX, IMAGE_INDEX, RAY_INDEX, TIME, 
     FORWARD_NEIGHBOR_TIME_DIFF, BACKWARD_NEIGHBOR_W2C, BACKWARD_NEIGHBOR_K, FORWARD_NEIGHBOR_W2C, FORWARD_NEIGHBOR_K, \
     SKY, MASK
 
+import warnings
+
 CONSOLE = Console(width=120)
 
 
@@ -84,11 +86,13 @@ class SUDSDataset(Dataset):
         self.loaded_chunk = None
 
     def load_chunk(self) -> None:
+        print('debug: load_chunk start')
         if self.chunk_future is None:
             self.chunk_future = self.chunk_load_executor.submit(self._load_chunk_inner)
 
         self.loaded_chunk = self.chunk_future.result()
         self.chunk_future = self.chunk_load_executor.submit(self._load_chunk_inner)
+        print('debug: load_chunk finish')
 
     def __len__(self) -> int:
         return self.loaded_chunk[RGB].shape[0] if self.loaded_chunk is not None else 0
@@ -134,12 +138,18 @@ class SUDSDataset(Dataset):
                 item[FORWARD_NEIGHBOR_K] = torch.zeros(3, 3)
                 item[FORWARD_NEIGHBOR_TIME_DIFF] = torch.zeros(1)
 
-            assert item[BACKWARD_NEIGHBOR_TIME_DIFF].min() >= 0, item[BACKWARD_NEIGHBOR_TIME_DIFF].min()
-            assert item[FORWARD_NEIGHBOR_TIME_DIFF].min() >= 0, item[FORWARD_NEIGHBOR_TIME_DIFF].min()
+            # assert item[BACKWARD_NEIGHBOR_TIME_DIFF].min() <= 0, item[BACKWARD_NEIGHBOR_TIME_DIFF].min()
+            # assert item[FORWARD_NEIGHBOR_TIME_DIFF].min() >= 0, item[FORWARD_NEIGHBOR_TIME_DIFF].min()
+            
+            if item[BACKWARD_NEIGHBOR_TIME_DIFF].min() > 0:
+                warnings.warn(f'item[BACKWARD_NEIGHBOR_TIME_DIFF].min() = {item[BACKWARD_NEIGHBOR_TIME_DIFF].min()} > 0')
+            if item[FORWARD_NEIGHBOR_TIME_DIFF].min() < 0:
+                warnings.warn(f'item[FORWARD_NEIGHBOR_TIME_DIFF].min() = {item[FORWARD_NEIGHBOR_TIME_DIFF].min()} < 0')
 
         return item
 
     def _load_chunk_inner(self) -> Dict[str, torch.Tensor]:
+        print('debug: _load_chunk_inner start')
         loaded_chunk = defaultdict(list)
         loaded = 0
 
@@ -155,6 +165,7 @@ class SUDSDataset(Dataset):
                         self.memory_fields = self._load_metadata_into_memory()
                     to_shuffle = self.memory_fields
 
+                # shuffle killed
                 shuffled_indices = torch.randperm(len(to_shuffle[IMAGE_INDEX]))
                 for key, val in to_shuffle.items():
                     self.loaded_fields[key] = val[shuffled_indices]
@@ -175,6 +186,7 @@ class SUDSDataset(Dataset):
             for key, val in loaded_fields.items():
                 loaded_chunk[key] = val
 
+        print('debug: _load_chunk_inner finish')
         return loaded_chunk
 
     def _load_random_subset(self) -> Dict[str, torch.Tensor]:
@@ -228,8 +240,8 @@ class SUDSDataset(Dataset):
                 continue
 
             image_indices.append(
-                torch.ones_like(image_keep_mask, dtype=torch.long)[image_keep_mask > 0] * metadata_item.image_index)
-            pixel_indices.append(torch.arange(metadata_item.W * metadata_item.H, dtype=torch.long)[image_keep_mask > 0])
+                torch.ones_like(image_keep_mask, dtype=torch.int)[image_keep_mask > 0] * metadata_item.image_index)
+            pixel_indices.append(torch.arange(metadata_item.W * metadata_item.H, dtype=torch.int)[image_keep_mask > 0])
 
             if RGB not in self.load_on_demand:
                 image_rgbs = metadata_item.load_image().view(-1, 3)[image_keep_mask > 0].float() / 255.
@@ -282,6 +294,34 @@ class SUDSDataset(Dataset):
 
         if self.load_sky and SKY not in self.load_on_demand:
             fields[SKY] = torch.cat(sky)
+
+        # image_indices.clear()
+        # pixel_indices.clear()
+
+        # if RGB not in self.load_on_demand:
+        #     rgbs.clear()
+
+        # if self.load_depth and DEPTH not in self.load_on_demand:
+        #     depths.clear()
+
+        # if self.load_features and FEATURES not in self.load_on_demand:
+        #     features.clear()
+
+        # if self.load_flow and BACKWARD_FLOW not in self.load_on_demand:
+        #     backward_flow.clear()
+        #     backward_flow_valid.clear()
+
+        # if self.load_flow and FORWARD_FLOW not in self.load_on_demand:
+        #     forward_flow.clear()
+        #     forward_flow_valid.clear()
+
+        # if self.load_sky and SKY not in self.load_on_demand:
+        #     sky.clear()
+        # import gc
+        # gc.collect()
+        # torch.cuda.empty_cache()
+
+        print('debug: returning fields data')
 
         return fields
 

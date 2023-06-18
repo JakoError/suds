@@ -25,6 +25,8 @@ from tqdm import tqdm
 
 from suds.stream_utils import get_filesystem, buffer_from_stream, image_from_stream
 
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 class ViTExtractor:
     """ This class facilitates extraction of features, descriptors, and saliency maps from a ViT.
@@ -402,6 +404,7 @@ def main(hparams: argparse.Namespace) -> None:
         image_batch, image_pil = extractor.preprocess(frames[i]['rgb_path'], hparams.load_size)
         descriptors = extractor.extract_descriptors(image_batch.to(device), hparams.layer, hparams.facet, hparams.bin)
 
+        
         buffer = BytesIO()
         torch.save(descriptors.view(extractor.num_patches[0], extractor.num_patches[1], descriptors.shape[-1]), buffer)
 
