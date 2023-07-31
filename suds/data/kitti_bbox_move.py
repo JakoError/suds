@@ -233,6 +233,17 @@ def save_integrate_label_file(label_filepath, moved_label_filepath, pos_shift, r
         f.writelines('\n'.join([' '.join(info) for info in infos]))
 
 
+def save_split_label_file(label_filepath, moved_label_dir, pos_shift, rotation):
+    frame_labels_map_origin = read_label_by_frame(label_filepath)
+    frame_labels_map_moved: defaultdict[int, list] = defaultdict(list)
+
+    for key, value in frame_labels_map_origin.items():
+        frame_labels_map_moved[key] = move_label_bbox(value, pos_shift, rotation)
+    for key, value in frame_labels_map_moved.items():
+        with open(os.path.join(moved_label_dir, f'{key:06}.txt'), 'w') as f:
+            f.writelines('\n'.join([' '.join(info) for info in value]))
+
+
 # def oxt_to_pose(oxts):
 #     scale = _lat_to_scale(oxts[0])
 #
@@ -322,6 +333,29 @@ def save_integrate_oxts_file(oxts_filepath, moved_oxts_filepath, pos_shift, rota
         f.writelines('\n'.join([' '.join(info) for info in infos]))
 
 
+def save_split_oxts_file(oxts_filepath, moved_oxts_dir, pos_shift, rotation):
+    with open(oxts_filepath, 'r') as f:
+        oxts = [line.strip() for line in f.readlines()]
+    infos = []
+    for oxt in oxts:
+        info = [float(param) for param in oxt.split(' ')]
+        assert len(info) == 30, 'info option number must be 30'
+        lat, lon, alt, roll, pitch, yaw = info[0], info[1], info[2], info[3], info[4], info[5]
+
+        lat += pos_shift[0]
+        lon += pos_shift[1]
+        alt += pos_shift[2]
+        roll += rotation[0]
+        pitch += rotation[1]
+        yaw += rotation[2]
+
+        info[0], info[1], info[2], info[3], info[4], info[5] = lat, lon, alt, roll, pitch, yaw
+        infos.append([str(param) for param in info])
+    for index, info in enumerate(infos):
+        with open(os.path.join(moved_oxts_dir, f'{index:06}.txt'), 'w') as f:
+            f.write(' '.join(info))
+
+
 def bbox_image_transform(hparams):
     frame_labels_map_origin = read_label_by_frame(hparams.render_label_file)
     frame_labels_map_moved: defaultdict[int, list] = defaultdict(list)
@@ -398,7 +432,7 @@ def main(hparams: Namespace) -> None:
     if hparams.render_path is not None and hparams.render_label_file is not None:
         bbox_image_transform(hparams)
     else:
-        print('\nskip render image with bbox')
+        print('skip render image with bbox')
 
     # save moved label file to target path
 
@@ -407,6 +441,9 @@ def main(hparams: Namespace) -> None:
             save_integrate_label_file(label_file,
                                       os.path.join(target_label_path, os.path.basename(label_file)),
                                       hparams.pos_shift, hparams.rotation)
+            split_label_dir = os.path.join(target_label_path, Path(label_file).stem)
+            os.makedirs(split_label_dir, exist_ok=True)
+            save_split_label_file(label_file, split_label_dir, hparams.pos_shift, hparams.rotation)
     else:
         print(f'label_files({kitti_label_path}) is not a directory, skip label file transformation')
 
@@ -416,6 +453,9 @@ def main(hparams: Namespace) -> None:
             save_integrate_oxts_file(oxts_file,
                                      os.path.join(target_oxts_path, os.path.basename(oxts_file)),
                                      hparams.pos_shift, hparams.rotation)
+            split_oxts_dir = os.path.join(target_oxts_path, Path(oxts_file).stem)
+            os.makedirs(split_oxts_dir, exist_ok=True)
+            save_split_oxts_file(oxts_file, split_oxts_dir, hparams.pos_shift, hparams.rotation)
     else:
         print(f'kitti_oxts_path({kitti_oxts_path}) is not a directory, skip oxts file transformation')
 
