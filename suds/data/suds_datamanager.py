@@ -196,10 +196,9 @@ class SUDSDataManager(DataManager):
             if pos_shift is not None:
                 c2w[..., 3] += pos_shift.to(c2w) / self.train_dataparser_outputs.metadata[POSE_SCALE_FACTOR]
             if camera_rotation is not None:
-                w = camera_rotation[0]
-                rx = camera_rotation[1]  # roll
-                ry = camera_rotation[2]  # pitch
-                rz = camera_rotation[3]  # heading
+                rx = camera_rotation[0]  # roll
+                ry = camera_rotation[1]  # pitch
+                rz = camera_rotation[2]  # heading
                 Rx = torch.FloatTensor([[1, 0, 0], 
                                         [0, np.cos(rx), -np.sin(rx)],
                                         [0, np.sin(rx), np.cos(rx)]])  # base => nav  (level oxts => rotated oxts)

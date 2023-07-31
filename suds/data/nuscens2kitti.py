@@ -262,8 +262,8 @@ class KittiConverter:
             pose_file = os.path.join(pose_folder, token + sample_token + '.npy')
             np.save(pose_file, ego_pose_matrix)
 
-            # save depth !! incorrect data
-            # self.process_depth_sample(sample_token, token, depth_folder)
+            # save depth
+            self.process_depth_sample(sample_token, token, depth_folder)
 
             # Convert image (jpg to png).
             src_im_path = os.path.join(self.nusc.dataroot, filename_cam_full)
