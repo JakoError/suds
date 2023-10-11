@@ -1,0 +1,4 @@
+output_path: metadata/nusc.json
+frame_ranges: [0, 80]
+nusc_cameras: ['CAM_FRONT_LEFT','CAM_FRONT','CAM_FRONT_RIGHT']
+train_every: 1

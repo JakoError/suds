@@ -1,3 +1,0 @@
-kitti_sequence: '0006'
-frame_ranges: [0, 20, 65, 120]
-train_every: 1

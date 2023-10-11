@@ -1,0 +1,3 @@
+output_path: metadata/nusc.json
+frame_ranges: [0, 40]
+train_every: 1
