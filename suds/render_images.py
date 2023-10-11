@@ -26,6 +26,7 @@ import tqdm
 
 CONSOLE = Console(width=120)
 
+
 @dataclass
 class RenderImages:
     # Path to config YAML file.
@@ -39,8 +40,8 @@ class RenderImages:
     end_frame: Optional[int] = None
 
     focal_mult: Optional[float] = None
-    pos_shift: Optional[List[float]] = None # x, y, z
-    camera_rotation: Optional[List[float]] = None # w, x, y, z example: 15° 90°
+    pos_shift: Optional[List[float]] = None
+    camera_rotation: Optional[List[float]] = None  # rotation may be not working try to change c2w in metadata
 
     feature_filter: Optional[List[int]] = None
     sigma_threshold: Optional[float] = None
@@ -60,13 +61,14 @@ class RenderImages:
         dataloader = pipeline.datamanager.all_indices_eval_dataloader(self.generate_ring_view, self.video_ids,
                                                                       self.start_frame, self.end_frame, self.focal_mult,
                                                                       torch.FloatTensor(self.pos_shift),
-                                                                      torch.FloatTensor(self.camera_rotation) * torch.pi / 180.)
+                                                                      torch.FloatTensor(
+                                                                          self.camera_rotation) * torch.pi / 180.)
         num_images = len(dataloader)
 
         render_options = {'static_only': self.static_only}
         if self.sigma_threshold is not None:
             render_options['sigma_threshold'] = self.sigma_threshold
-        if self.max_altitude is not None:                
+        if self.max_altitude is not None:
             render_options['max_altitude'] = self.max_altitude
         if self.feature_filter is not None:
             render_options['feature_filter'] = self.feature_filter
@@ -93,7 +95,9 @@ class RenderImages:
 
             all_present = True
             for key in to_check:
-                candidiate = (self.output_path / video_id / f'camera_{frame_id % self.camera_group_num}' / '{0}-{1:06d}.jpg'.format(key, frame_id))
+                candidiate = (
+                            self.output_path / video_id / f'camera_{frame_id % self.camera_group_num}' / '{0}-{1:06d}.jpg'.format(
+                        key, frame_id))
                 if candidiate.exists():
                     images[key] = np.asarray(Image.open(candidiate))
                 else:
@@ -102,26 +106,28 @@ class RenderImages:
 
             if not all_present:
                 outputs = pipeline.model.get_outputs_for_camera_ray_bundle(camera_ray_bundle,
-                                                                            render_options=render_options)
+                                                                           render_options=render_options)
 
                 images[RGB] = (outputs[RGB] * 255).byte().cpu().numpy()
                 images[DEPTH] = (pipeline.model.apply_depth_colormap(outputs[DEPTH]) * 255).byte().cpu().numpy()
                 for key in pipeline.model.config.feature_clusters:
                     images[f'{FEATURES}_{key}'] = (outputs[f'{FEATURES}_{key}'] * 255).byte().cpu().numpy()
 
-            (self.output_path / video_id / f'camera_{frame_id % self.camera_group_num}').mkdir(parents=True, exist_ok=True)
+            (self.output_path / video_id / f'camera_{frame_id % self.camera_group_num}').mkdir(parents=True,
+                                                                                               exist_ok=True)
             for key, val in images.items():
                 Image.fromarray(val).save(
-                    self.output_path / video_id / f'camera_{frame_id % self.camera_group_num}' / '{0}-{1:06d}.jpg'.format(key, frame_id))
+                    self.output_path / video_id / f'camera_{frame_id % self.camera_group_num}' / '{0}-{1:06d}.jpg'.format(
+                        key, frame_id))
 
             if self.generate_ring_view:
                 ring_buffer.append(images)
 
             if len(ring_buffer) == 7:
                 merged_W = ring_buffer[1][RGB].shape[1] + \
-                            ring_buffer[0][RGB].shape[1] + ring_buffer[2][RGB].shape[1]
+                           ring_buffer[0][RGB].shape[1] + ring_buffer[2][RGB].shape[1]
                 merged_H = max(ring_buffer[0][RGB].shape[0], ring_buffer[1][RGB].shape[0] +
-                                ring_buffer[5][RGB].shape[0] + ring_buffer[3][RGB].shape[0])
+                               ring_buffer[5][RGB].shape[0] + ring_buffer[3][RGB].shape[0])
 
                 offsets = [
                     (ring_buffer[1][RGB].shape[1], 0),
@@ -129,7 +135,7 @@ class RenderImages:
                     (ring_buffer[1][RGB].shape[1] + ring_buffer[0][RGB].shape[1], 0),
                     (0, ring_buffer[1][RGB].shape[0] + ring_buffer[5][RGB].shape[0]),
                     (ring_buffer[1][RGB].shape[1] + ring_buffer[0][RGB].shape[1],
-                        ring_buffer[1][RGB].shape[0] + ring_buffer[5][RGB].shape[0]),
+                     ring_buffer[1][RGB].shape[0] + ring_buffer[5][RGB].shape[0]),
                     (0, ring_buffer[1][RGB].shape[0]),
                     (ring_buffer[1][RGB].shape[1] + ring_buffer[0][RGB].shape[1], ring_buffer[1][RGB].shape[0])
                 ]
